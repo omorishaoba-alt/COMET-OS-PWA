@@ -7,6 +7,8 @@ const FLOW = [
   "VERIFY"
 ];
 
+const STORAGE_KEY = "COMET_LEDGER_V1";
+
 let state = {
   index: 0,
   data: {},
@@ -14,6 +16,43 @@ let state = {
 };
 
 const app = document.getElementById("app");
+
+/* -------------------------
+   PERSISTENCE LOAD
+-------------------------- */
+function loadLedger() {
+
+  const saved = localStorage.getItem(STORAGE_KEY);
+
+  if (!saved) return;
+
+  try {
+
+    const parsed = JSON.parse(saved);
+
+    state = parsed;
+
+  } catch (e) {
+
+    console.error("LEDGER CORRUPTED - RESETTING");
+
+    localStorage.removeItem(STORAGE_KEY);
+
+  }
+
+}
+
+/* -------------------------
+   PERSISTENCE SAVE
+-------------------------- */
+function saveLedger() {
+
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify(state)
+  );
+
+}
 
 /* -------------------------
    RENDER ENGINE
@@ -35,7 +74,7 @@ function render() {
 }
 
 /* -------------------------
-   LEDGER HASH GENERATOR
+   LEDGER HASH
 -------------------------- */
 async function createLedgerHash(step, payload, prevHash) {
 
@@ -47,7 +86,7 @@ async function createLedgerHash(step, payload, prevHash) {
 }
 
 /* -------------------------
-   COMET CORE ENGINE
+   CORE ENGINE
 -------------------------- */
 window.COMET = {
 
@@ -69,28 +108,23 @@ window.COMET = {
         );
 
       if (!valid) {
-        console.error("LEDGER CHAIN BROKEN");
+        console.error("LEDGER BLOCKED");
         return;
       }
 
-      /* -------------------------
-         STORE CHAIN LINK
-      -------------------------- */
       state.data[step] = {
         payload,
         hash,
         prevHash: state.lastHash
       };
 
-      /* -------------------------
-         UPDATE CHAIN POINTER
-      -------------------------- */
       state.lastHash = hash;
 
       if (state.index < FLOW.length - 1) {
         state.index++;
       }
 
+      saveLedger();
       render();
 
     });
@@ -112,7 +146,7 @@ window.COMET = {
 };
 
 /* -------------------------
-   DAY 0 TEST HARNESS (UPDATED)
+   DAY 0 TEST HARNESS (WITH RECOVERY CHECK)
 -------------------------- */
 window.runDay0Tests = async function () {
 
@@ -123,7 +157,7 @@ window.runDay0Tests = async function () {
   const steps = Object.keys(COMET.state.data);
 
   // -------------------------
-  // TEST 1: FLOW ORDER
+  // FLOW ORDER CHECK
   // -------------------------
   const flowOk =
     steps.every((s, i) => s === FLOW[i]);
@@ -131,7 +165,7 @@ window.runDay0Tests = async function () {
   if (!flowOk) pass = false;
 
   // -------------------------
-  // TEST 2: CHAIN INTEGRITY
+  // CHAIN VALIDATION
   // -------------------------
   let prev = "GENESIS";
 
@@ -144,13 +178,13 @@ window.runDay0Tests = async function () {
       break;
     }
 
-    const expectedHash =
+    const expected =
       await TrustEngine.createStageHash(
         step + prev,
         item.payload
       );
 
-    if (expectedHash !== item.hash) {
+    if (expected !== item.hash) {
       pass = false;
       break;
     }
@@ -159,17 +193,15 @@ window.runDay0Tests = async function () {
 
   }
 
-  // -------------------------
-  // FINAL RESULT
-  // -------------------------
   resultBox.innerHTML =
     pass
-      ? "DAY 0 PASS ✓ LEDGER CHAIN VALID"
-      : "DAY 0 FAIL ✗ CHAIN BROKEN";
+      ? "DAY 0 PASS ✓ PERSISTENT CHAIN VALID"
+      : "DAY 0 FAIL ✗ PERSISTENCE BROKEN";
 
 };
 
 /* -------------------------
-   INIT
+   INIT (WITH RECOVERY)
 -------------------------- */
+loadLedger();
 render();
