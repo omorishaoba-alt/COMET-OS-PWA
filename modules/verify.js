@@ -1,1 +1,19 @@
-window.VERIFY = { render: () => `<h2>VERIFY</h2><pre>${JSON.stringify(state,null,2)}</pre>` };
+window.VERIFY = {
+
+render(state) {
+
+return `
+  <h2>VERIFY</h2>
+
+  <button onclick="runValidation()">
+    VALIDATE TRUST
+  </button>
+
+  <pre>${JSON.stringify(state.data, null, 2)}</pre>
+
+  <div id="result"></div>
+`;
+
+}
+
+};
