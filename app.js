@@ -47,7 +47,9 @@ window.COMET = {
       };
 
       if (state.index < FLOW.length - 1) {
+
         state.index++;
+
       }
 
       render();
@@ -61,7 +63,9 @@ window.COMET = {
   back() {
 
     if (state.index > 0) {
+
       state.index--;
+
     }
 
     render();
@@ -69,39 +73,6 @@ window.COMET = {
   },
 
   state
-
-};
-
-window.runValidation = async function () {
-
-  const stages = Object.keys(COMET.state.data);
-
-  let valid = true;
-
-  for (const stage of stages) {
-
-    const item = COMET.state.data[stage];
-
-    const ok = await TrustEngine.validateStage(
-      stage,
-      item.payload,
-      item.hash
-    );
-
-    if (!ok) {
-      valid = false;
-      break;
-    }
-
-  }
-
-  const result = document.getElementById("result");
-
-  if (result) {
-    result.innerHTML = valid
-      ? "TRUST VALID"
-      : "TRUST FAILED";
-  }
 
 };
 
