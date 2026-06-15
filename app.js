@@ -9,22 +9,11 @@ const FLOW = [
 
 let state = {
   index: 0,
-  data: {}
+  data: {},
+  lastHash: "GENESIS"
 };
 
 const app = document.getElementById("app");
-
-/* -------------------------
-   IMMUTABLE STATE LOCK
--------------------------- */
-function lockDeep(obj) {
-  Object.keys(obj).forEach(key => {
-    if (typeof obj[key] === "object" && obj[key] !== null) {
-      lockDeep(obj[key]);
-    }
-  });
-  return Object.freeze(obj);
-}
 
 /* -------------------------
    RENDER ENGINE
@@ -46,10 +35,15 @@ function render() {
 }
 
 /* -------------------------
-   AUTO-GUARD VALIDATION
+   LEDGER HASH GENERATOR
 -------------------------- */
-function isValidStage(step, payload, hash) {
-  return TrustEngine.validateStage(step, payload, hash);
+async function createLedgerHash(step, payload, prevHash) {
+
+  return await TrustEngine.createStageHash(
+    step + prevHash,
+    payload
+  );
+
 }
 
 /* -------------------------
@@ -61,40 +55,45 @@ window.COMET = {
 
     const step = FLOW[state.index];
 
-    TrustEngine.createStageHash(step, payload)
-      .then(async (hash) => {
+    createLedgerHash(
+      step,
+      payload,
+      state.lastHash
+    ).then(async (hash) => {
 
-        const valid = await isValidStage(
-          step,
+      const valid =
+        await TrustEngine.validateStage(
+          step + state.lastHash,
           payload,
           hash
         );
 
-        /* -------------------------
-           AUTO-GUARD MODE
-        -------------------------- */
-        if (!valid) {
-          console.error("AUTO-GUARD BLOCK: INVALID STAGE");
-          return;
-        }
+      if (!valid) {
+        console.error("LEDGER CHAIN BROKEN");
+        return;
+      }
 
-        /* -------------------------
-           IMMUTABLE STATE LOCK
-        -------------------------- */
-        const lockedEntry = lockDeep({
-          payload,
-          hash
-        });
+      /* -------------------------
+         STORE CHAIN LINK
+      -------------------------- */
+      state.data[step] = {
+        payload,
+        hash,
+        prevHash: state.lastHash
+      };
 
-        state.data[step] = lockedEntry;
+      /* -------------------------
+         UPDATE CHAIN POINTER
+      -------------------------- */
+      state.lastHash = hash;
 
-        if (state.index < FLOW.length - 1) {
-          state.index++;
-        }
+      if (state.index < FLOW.length - 1) {
+        state.index++;
+      }
 
-        render();
+      render();
 
-      });
+    });
 
   },
 
@@ -113,7 +112,7 @@ window.COMET = {
 };
 
 /* -------------------------
-   DAY 0 TEST HARNESS
+   DAY 0 TEST HARNESS (UPDATED)
 -------------------------- */
 window.runDay0Tests = async function () {
 
@@ -121,52 +120,52 @@ window.runDay0Tests = async function () {
 
   let pass = true;
 
-  const expectedFlow = [
-    "PVN",
-    "TX",
-    "PAY",
-    "REPORT",
-    "TAQ",
-    "VERIFY"
-  ];
+  const steps = Object.keys(COMET.state.data);
 
-  const actualFlow = Object.keys(COMET.state.data);
-
+  // -------------------------
+  // TEST 1: FLOW ORDER
+  // -------------------------
   const flowOk =
-    expectedFlow.length === actualFlow.length &&
-    expectedFlow.every((step, i) => step === actualFlow[i]);
+    steps.every((s, i) => s === FLOW[i]);
 
   if (!flowOk) pass = false;
 
-  const stateOk =
-    actualFlow.every(step => {
-      const item = COMET.state.data[step];
-      return item && item.payload !== undefined && item.hash !== undefined;
-    });
+  // -------------------------
+  // TEST 2: CHAIN INTEGRITY
+  // -------------------------
+  let prev = "GENESIS";
 
-  if (!stateOk) pass = false;
-
-  for (const step of actualFlow) {
+  for (const step of steps) {
 
     const item = COMET.state.data[step];
 
-    const ok = await TrustEngine.validateStage(
-      step,
-      item.payload,
-      item.hash
-    );
-
-    if (!ok) {
+    if (item.prevHash !== prev) {
       pass = false;
       break;
     }
 
+    const expectedHash =
+      await TrustEngine.createStageHash(
+        step + prev,
+        item.payload
+      );
+
+    if (expectedHash !== item.hash) {
+      pass = false;
+      break;
+    }
+
+    prev = item.hash;
+
   }
 
+  // -------------------------
+  // FINAL RESULT
+  // -------------------------
   resultBox.innerHTML =
     pass
-      ? "DAY 0 PASS ✓ SYSTEM VALID"
-      : "DAY 0 FAIL ✗ SYSTEM INVALID";
+      ? "DAY 0 PASS ✓ LEDGER CHAIN VALID"
+      : "DAY 0 FAIL ✗ CHAIN BROKEN";
 
 };
 
