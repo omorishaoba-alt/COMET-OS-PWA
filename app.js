@@ -14,6 +14,21 @@ let state = {
 
 const app = document.getElementById("app");
 
+/* -------------------------
+   IMMUTABLE STATE LOCK
+-------------------------- */
+function lockDeep(obj) {
+  Object.keys(obj).forEach(key => {
+    if (typeof obj[key] === "object" && obj[key] !== null) {
+      lockDeep(obj[key]);
+    }
+  });
+  return Object.freeze(obj);
+}
+
+/* -------------------------
+   RENDER ENGINE
+-------------------------- */
 function render() {
 
   const step = FLOW[state.index];
@@ -30,29 +45,56 @@ function render() {
 
 }
 
+/* -------------------------
+   AUTO-GUARD VALIDATION
+-------------------------- */
+function isValidStage(step, payload, hash) {
+  return TrustEngine.validateStage(step, payload, hash);
+}
+
+/* -------------------------
+   COMET CORE ENGINE
+-------------------------- */
 window.COMET = {
 
   next(payload = {}) {
 
     const step = FLOW[state.index];
 
-    TrustEngine.createStageHash(
-      step,
-      payload
-    ).then(hash => {
+    TrustEngine.createStageHash(step, payload)
+      .then(async (hash) => {
 
-      state.data[step] = {
-        payload,
-        hash
-      };
+        const valid = await isValidStage(
+          step,
+          payload,
+          hash
+        );
 
-      if (state.index < FLOW.length - 1) {
-        state.index++;
-      }
+        /* -------------------------
+           AUTO-GUARD MODE
+        -------------------------- */
+        if (!valid) {
+          console.error("AUTO-GUARD BLOCK: INVALID STAGE");
+          return;
+        }
 
-      render();
+        /* -------------------------
+           IMMUTABLE STATE LOCK
+        -------------------------- */
+        const lockedEntry = lockDeep({
+          payload,
+          hash
+        });
 
-    });
+        state.data[step] = lockedEntry;
+
+        if (state.index < FLOW.length - 1) {
+          state.index++;
+        }
+
+        render();
+
+      });
 
   },
 
@@ -70,10 +112,9 @@ window.COMET = {
 
 };
 
-// -------------------------
-// DAY 0 TEST HARNESS
-// -------------------------
-
+/* -------------------------
+   DAY 0 TEST HARNESS
+-------------------------- */
 window.runDay0Tests = async function () {
 
   const resultBox = document.getElementById("result");
@@ -129,4 +170,7 @@ window.runDay0Tests = async function () {
 
 };
 
+/* -------------------------
+   INIT
+-------------------------- */
 render();
