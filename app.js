@@ -1,42 +1,79 @@
-const FLOW = ["PVN", "TX", "PAY", "REPORT", "TAQ", "VERIFY"];
+const FLOW = [
+"PVN",
+"TX",
+"PAY",
+"REPORT",
+"TAQ",
+"VERIFY"
+];
 
 let state = {
-  index: 0,
-  data: {}
+index: 0,
+data: {}
 };
 
 const app = document.getElementById("app");
 
 function render() {
-  const step = FLOW[state.index];
 
-  const screen = document.createElement("div");
-  screen.className = "screen active";
-  screen.innerHTML = window[step].render(state);
+const step = FLOW[state.index];
 
-  app.innerHTML = "";
-  app.appendChild(screen);
+const screen = document.createElement("div");
+
+screen.className = "screen active";
+
+screen.innerHTML = window[step].render(state);
+
+app.innerHTML = "";
+
+app.appendChild(screen);
+
 }
 
 window.COMET = {
-  next(payload = {}) {
-    const step = FLOW[state.index];
 
-    state.data[step] = payload;
+next(payload = {}) {
 
-    if (state.index < FLOW.length - 1) {
-      state.index++;
-    }
+const step = FLOW[state.index];
 
-    render();
-  },
+TrustEngine.createStageHash(
+  step,
+  payload
+).then(hash => {
 
-  back() {
-    if (state.index > 0) state.index--;
-    render();
-  },
+  state.data[step] = {
+    payload,
+    hash
+  };
 
-  state
+  if (state.index < FLOW.length - 1) {
+
+    state.index++;
+
+  }
+
+  render();
+
+});
+
+return;
+
+},
+
+back() {
+
+if (state.index > 0) {
+
+  state.index--;
+
+}
+
+render();
+
+},
+
+state
+
 };
 
 render();
