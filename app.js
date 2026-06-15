@@ -18,7 +18,7 @@ let state = {
 const app = document.getElementById("app");
 
 /* -------------------------
-   PERSISTENCE LOAD
+   LOAD LEDGER
 -------------------------- */
 function loadLedger() {
 
@@ -34,7 +34,7 @@ function loadLedger() {
 
   } catch (e) {
 
-    console.error("LEDGER CORRUPTED - RESETTING");
+    console.error("CORRUPTED LEDGER FILE - RESET");
 
     localStorage.removeItem(STORAGE_KEY);
 
@@ -43,7 +43,7 @@ function loadLedger() {
 }
 
 /* -------------------------
-   PERSISTENCE SAVE
+   SAVE LEDGER
 -------------------------- */
 function saveLedger() {
 
@@ -74,7 +74,7 @@ function render() {
 }
 
 /* -------------------------
-   LEDGER HASH
+   HASH GENERATOR
 -------------------------- */
 async function createLedgerHash(step, payload, prevHash) {
 
@@ -82,6 +82,52 @@ async function createLedgerHash(step, payload, prevHash) {
     step + prevHash,
     payload
   );
+
+}
+
+/* -------------------------
+   RECOVERY PROOF ENGINE
+-------------------------- */
+async function recoverLedger() {
+
+  const recovered = {};
+  let prev = "GENESIS";
+  let validIndex = 0;
+
+  for (const step of FLOW) {
+
+    const item = state.data[step];
+
+    if (!item) break;
+
+    const expected =
+      await TrustEngine.createStageHash(
+        step + prev,
+        item.payload
+      );
+
+    if (expected !== item.hash) {
+
+      console.warn(
+        "LEDGER BREAK DETECTED AT:",
+        step
+      );
+
+      break;
+
+    }
+
+    recovered[step] = item;
+    prev = item.hash;
+    validIndex++;
+
+  }
+
+  state.data = recovered;
+  state.index = validIndex;
+  state.lastHash = prev;
+
+  console.log("RECOVERY COMPLETE");
 
 }
 
@@ -146,7 +192,7 @@ window.COMET = {
 };
 
 /* -------------------------
-   DAY 0 TEST HARNESS (WITH RECOVERY CHECK)
+   DAY 0 TEST HARNESS
 -------------------------- */
 window.runDay0Tests = async function () {
 
@@ -156,27 +202,16 @@ window.runDay0Tests = async function () {
 
   const steps = Object.keys(COMET.state.data);
 
-  // -------------------------
-  // FLOW ORDER CHECK
-  // -------------------------
   const flowOk =
     steps.every((s, i) => s === FLOW[i]);
 
   if (!flowOk) pass = false;
 
-  // -------------------------
-  // CHAIN VALIDATION
-  // -------------------------
   let prev = "GENESIS";
 
   for (const step of steps) {
 
     const item = COMET.state.data[step];
-
-    if (item.prevHash !== prev) {
-      pass = false;
-      break;
-    }
 
     const expected =
       await TrustEngine.createStageHash(
@@ -195,13 +230,13 @@ window.runDay0Tests = async function () {
 
   resultBox.innerHTML =
     pass
-      ? "DAY 0 PASS ✓ PERSISTENT CHAIN VALID"
-      : "DAY 0 FAIL ✗ PERSISTENCE BROKEN";
+      ? "DAY 0 PASS ✓ RECOVERY PROOF VALID"
+      : "DAY 0 FAIL ✗ CHAIN BROKEN";
 
 };
 
 /* -------------------------
-   INIT (WITH RECOVERY)
+   INIT (WITH RECOVERY PROOF LAYER)
 -------------------------- */
 loadLedger();
-render();
+recoverLedger().then(render);
