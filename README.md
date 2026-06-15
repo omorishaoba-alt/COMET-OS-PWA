@@ -13,3 +13,6 @@ MVP Development Phase
 Repository
 
 Frontend PWA implementation of COMET OS™.
+
+COMET OS MVP DAY 0
+INITIAL FRONTEND SYSTEM BOOTSTRAP
