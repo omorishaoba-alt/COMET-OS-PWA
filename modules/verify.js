@@ -1,19 +1,21 @@
 window.VERIFY = {
 
-render(state) {
+  render(state) {
 
-return `
-  <h2>VERIFY</h2>
+    return `
+      <h2>VERIFY</h2>
 
-  <button onclick="runValidation()">
-    VALIDATE TRUST
-  </button>
+      <button onclick="runDay0Tests()">
+        RUN VALIDATION
+      </button>
 
-  <pre>${JSON.stringify(state.data, null, 2)}</pre>
+      <pre id="output">
+${JSON.stringify(state.data, null, 2)}
+      </pre>
 
-  <div id="result"></div>
-`;
+      <div id="result"></div>
+    `;
 
-}
+  }
 
 };
